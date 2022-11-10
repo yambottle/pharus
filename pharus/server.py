@@ -23,6 +23,8 @@ from base64 import b64decode
 from datajoint.errors import IntegrityError
 from datajoint.table import foreign_key_error_regexp
 from datajoint.utils import to_camel_case
+import traceback
+import time
 
 app = Flask(__name__)
 # Check if PRIVATE_KEY and PUBIC_KEY is set, if not generate them.
@@ -125,7 +127,7 @@ def api_version() -> str:
             Content-Type: application/json
 
             {
-                "version": "0.6.0"
+                "version": "0.6.2"
             }
 
         :statuscode 200: No error.
@@ -234,6 +236,7 @@ def login() -> dict:
                 auth_info = dict(
                     jwt=result.json()["access_token"], id=result.json()["id_token"]
                 )
+                time.sleep(1)
                 connect_creds = {
                     "databaseAddress": request.args["database_host"],
                     "username": jwt.decode(
@@ -281,7 +284,7 @@ def login() -> dict:
                 else:
                     raise e
             return dict(**auth_info)
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -343,7 +346,7 @@ def schema(connection: dj.Connection) -> dict:
         try:
             schemas_name = _DJConnector._list_schemas(connection)
             return dict(schemaNames=schemas_name)
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -420,7 +423,7 @@ def table(
         try:
             tables_dict_list = _DJConnector._list_tables(connection, schema_name)
             return dict(tableTypes=tables_dict_list)
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -571,7 +574,9 @@ def record(
                 Vary: Accept
                 Content-Type: text/plain
 
-                Insert Successful
+                {
+                    "response": "Insert Successful"
+                }
 
             **Example unexpected response**:
 
@@ -629,7 +634,9 @@ def record(
                 Vary: Accept
                 Content-Type: text/plain
 
-                Update Successful
+                {
+                    "response": "Update Successful"
+                }
 
             **Example unexpected response**:
 
@@ -671,7 +678,9 @@ def record(
                 Vary: Accept
                 Content-Type: text/plain
 
-                Delete Successful
+                {
+                    "response": "Delete Successful"
+                }
 
             **Example conflict response**:
 
@@ -742,23 +751,23 @@ def record(
             return dict(
                 recordHeader=record_header, records=table_tuples, totalCount=total_count
             )
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
     elif request.method == "POST":
         try:
             _DJConnector._insert_tuple(
                 connection, schema_name, table_name, request.json["records"]
             )
-            return "Insert Successful"
-        except Exception as e:
+            return {"response": "Insert Successful"}
+        except Exception:
             return traceback.format_exc(), 500
     elif request.method == "PATCH":
         try:
             _DJConnector._update_tuple(
                 connection, schema_name, table_name, request.json["records"]
             )
-            return "Update Successful"
-        except Exception as e:
+            return {"response": "Update Successful"}
+        except Exception:
             return traceback.format_exc(), 500
     elif request.method == "DELETE":
         try:
@@ -777,7 +786,7 @@ def record(
                     if k == "cascade"
                 },
             )
-            return "Delete Sucessful"
+            return {"response": "Delete Successful"}
         except IntegrityError as e:
             match = foreign_key_error_regexp.match(e.args[0])
             return (
@@ -789,7 +798,7 @@ def record(
                 ),
                 409,
             )
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -872,7 +881,7 @@ def definition(
                 connection, schema_name, table_name
             )
             return table_definition
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -1051,7 +1060,7 @@ def attribute(
                 attributeHeaders=attributes_meta["attribute_headers"],
                 attributes=attributes_meta["attributes"],
             )
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -1158,7 +1167,7 @@ def dependency(
                 ),
             )
             return dict(dependencies=dependencies)
-        except Exception as e:
+        except Exception:
             return traceback.format_exc(), 500
 
 
@@ -1166,7 +1175,7 @@ def run():
     """
     Starts API server.
     """
-    app.run(host="0.0.0.0", port=environ.get("PHARUS_PORT", 5000), threaded=True)
+    app.run(host="0.0.0.0", port=environ.get("PHARUS_PORT", 5000), threaded=False)
 
 
 if __name__ == "__main__":
